@@ -273,7 +273,8 @@ static NSString *const FBSDKExpectedChallengeKey = @"expected_login_challenge";
     if (!expectedChallenge) {
         expectedChallenge = [[NSUserDefaults standardUserDefaults] objectForKey:FBSDKExpectedChallengeKey];
         [[NSNotificationCenter defaultCenter] postNotificationName:FBSDKLoginManagerDidLoadFromDefaultsExpectedChallenge
-                                                            object:expectedChallenge ? @{FBSDKLoginManagerExpectedChallengeValueKey:expectedChallenge} : nil];
+                                                            object:nil
+                                                          userInfo:expectedChallenge ? @{ FBSDKLoginManagerExpectedChallengeValueKey : expectedChallenge } : nil];
     }
     return expectedChallenge;
 }
@@ -381,7 +382,9 @@ static NSString *const FBSDKExpectedChallengeKey = @"expected_login_challenge";
     [[NSUserDefaults standardUserDefaults] synchronize];
     
     if (!isStored) {
-        [[NSNotificationCenter defaultCenter] postNotificationName:FBSDKLoginManagerDidFailToStoreExpectedChallenge object:nil];
+        [[NSNotificationCenter defaultCenter] postNotificationName:FBSDKLoginManagerDidFailToStoreExpectedChallenge
+                                                            object:nil
+                                                          userInfo:challengeExpected ? @{ FBSDKLoginManagerExpectedChallengeValueKey:challengeExpected } : nil];
     }
 }
 
