@@ -19,6 +19,10 @@
 #import <Accounts/Accounts.h>
 #import <Foundation/Foundation.h>
 
+extern NSString *const FBSDKLoginManagerDidFailToStoreExpectedChallenge;
+extern NSString *const FBSDKLoginManagerDidLoadFromDefaultsExpectedChallenge;
+extern NSString *const FBSDKLoginManagerExpectedChallengeValueKey;
+
 @class FBSDKLoginManagerLoginResult;
 
 /*!

@@ -30,6 +30,10 @@
 #import "FBSDKLoginManagerLoginResult.h"
 #import "FBSDKLoginUtility.h"
 
+NSString *const FBSDKLoginManagerDidFailToStoreExpectedChallenge = @"FBSDKLoginManagerDidFailToStoreExpectedChallenge";
+NSString *const FBSDKLoginManagerDidLoadFromDefaultsExpectedChallenge = @"FBSDKLoginManagerDidLoadFromDefaultsExpectedChallenge";
+NSString *const FBSDKLoginManagerExpectedChallengeValueKey = @"FBSDKLoginManagerExpectedChallengeValueKey";
+
 static int const FBClientStateChallengeLength = 20;
 static NSString *const FBSDKExpectedChallengeKey = @"expected_login_challenge";
 
@@ -265,7 +269,13 @@ static NSString *const FBSDKExpectedChallengeKey = @"expected_login_challenge";
 
 - (NSString *)loadExpectedChallenge
 {
-  return [_keychainStore stringForKey:FBSDKExpectedChallengeKey];
+    NSString *expectedChallenge = [_keychainStore stringForKey:FBSDKExpectedChallengeKey];
+    if (!expectedChallenge) {
+        expectedChallenge = [[NSUserDefaults standardUserDefaults] objectForKey:FBSDKExpectedChallengeKey];
+        [[NSNotificationCenter defaultCenter] postNotificationName:FBSDKLoginManagerDidLoadFromDefaultsExpectedChallenge
+                                                            object:expectedChallenge ? @{FBSDKLoginManagerExpectedChallengeValueKey:expectedChallenge} : nil];
+    }
+    return expectedChallenge;
 }
 
 - (NSDictionary *)logInParametersWithPermissions:(NSSet *)permissions
@@ -363,9 +373,16 @@ static NSString *const FBSDKExpectedChallengeKey = @"expected_login_challenge";
 
 - (void)storeExpectedChallenge:(NSString *)challengeExpected
 {
-  [_keychainStore setString:challengeExpected
-                     forKey:FBSDKExpectedChallengeKey
-              accessibility:[FBSDKDynamicFrameworkLoader loadkSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]];
+    BOOL isStored = [_keychainStore setString:challengeExpected
+                                       forKey:FBSDKExpectedChallengeKey
+                                accessibility:[FBSDKDynamicFrameworkLoader loadkSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]];
+    
+    [[NSUserDefaults standardUserDefaults] setObject:challengeExpected forKey:FBSDKExpectedChallengeKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    
+    if (!isStored) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:FBSDKLoginManagerDidFailToStoreExpectedChallenge object:nil];
+    }
 }
 
 + (NSString *)stringForChallenge {
