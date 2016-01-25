@@ -38,7 +38,7 @@ static NSString *const FBSDKAppLinkInboundEvent = @"fb_al_inbound";
   FBSDKBridgeAPIRequest *_pendingRequest;
   FBSDKBridgeAPICallbackBlock _pendingRequestCompletionBlock;
   id<FBSDKURLOpening> _pendingURLOpen;
-  BOOL _expectingResign;
+  BOOL _expectingBackground;
 }
 
 #pragma mark - Class Methods
@@ -86,7 +86,7 @@ static NSString *const FBSDKAppLinkInboundEvent = @"fb_al_inbound";
 {
   if ((self = [super init]) != nil) {
     NSNotificationCenter *defaultCenter = [NSNotificationCenter defaultCenter];
-    [defaultCenter addObserver:self selector:@selector(applicationWillResignActive:) name:UIApplicationWillResignActiveNotification object:nil];
+    [defaultCenter addObserver:self selector:@selector(applicationDidEnterBackground:) name:UIApplicationDidEnterBackgroundNotification object:nil];
     [defaultCenter addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
   }
   return self;
@@ -156,18 +156,18 @@ static NSString *const FBSDKAppLinkInboundEvent = @"fb_al_inbound";
   return NO;
 }
 
-- (void)applicationWillResignActive:(NSNotification *)notification
+- (void)applicationDidEnterBackground:(NSNotification *)notification
 {
   _active = NO;
-  _expectingResign = NO;
+  _expectingBackground = NO;
 }
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification
 {
-  //  _expectingResign can be YES if the caller started doing work (like login)
+  //  _expectingBackground can be YES if the caller started doing work (like login)
   // within the app delegate's lifecycle like openURL, in which case there
   // might have been a "didBecomeActive" event pending that we want to ignore.
-  if (!_expectingResign) {
+  if (!_expectingBackground) {
     _active = YES;
     [_pendingURLOpen applicationDidBecomeActive:[notification object]];
     _pendingURLOpen = nil;
@@ -205,7 +205,7 @@ static NSString *const FBSDKAppLinkInboundEvent = @"fb_al_inbound";
 - (BOOL)openURL:(NSURL *)url sender:(id<FBSDKURLOpening>)sender
 {
   if ([[UIApplication sharedApplication] canOpenURL:url]) {
-    _expectingResign = YES;
+    _expectingBackground = YES;
     _pendingURLOpen = sender;
 
     dispatch_async(dispatch_get_main_queue(), ^{
