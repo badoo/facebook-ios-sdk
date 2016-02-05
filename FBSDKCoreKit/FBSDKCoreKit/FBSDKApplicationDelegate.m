@@ -39,6 +39,7 @@ static NSString *const FBSDKAppLinkInboundEvent = @"fb_al_inbound";
   FBSDKBridgeAPICallbackBlock _pendingRequestCompletionBlock;
   id<FBSDKURLOpening> _pendingURLOpen;
   BOOL _expectingBackground;
+  NSTimer *_pendingRequestExpirationTimer;
 }
 
 #pragma mark - Class Methods
@@ -88,6 +89,7 @@ static NSString *const FBSDKAppLinkInboundEvent = @"fb_al_inbound";
     NSNotificationCenter *defaultCenter = [NSNotificationCenter defaultCenter];
     [defaultCenter addObserver:self selector:@selector(applicationDidEnterBackground:) name:UIApplicationDidEnterBackgroundNotification object:nil];
     [defaultCenter addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
+    [defaultCenter addObserver:self selector:@selector(applicationWillResignActive:) name:UIApplicationWillResignActiveNotification object:nil];
   }
   return self;
 }
@@ -162,24 +164,45 @@ static NSString *const FBSDKAppLinkInboundEvent = @"fb_al_inbound";
   _expectingBackground = NO;
 }
 
+- (void)applicationWillResignActive:(NSNotification *)notification
+{
+  [_pendingRequestExpirationTimer invalidate];
+  _pendingRequestExpirationTimer = nil;
+}
+
 - (void)applicationDidBecomeActive:(NSNotification *)notification
 {
   //  _expectingBackground can be YES if the caller started doing work (like login)
   // within the app delegate's lifecycle like openURL, in which case there
   // might have been a "didBecomeActive" event pending that we want to ignore.
   if (!_expectingBackground) {
-    _active = YES;
-    [_pendingURLOpen applicationDidBecomeActive:[notification object]];
-    _pendingURLOpen = nil;
-
-    if (_pendingRequest && _pendingRequestCompletionBlock) {
-      _pendingRequestCompletionBlock([FBSDKBridgeAPIResponse bridgeAPIResponseCancelledWithRequest:_pendingRequest]);
-    }
-    _pendingRequest = nil;
-    _pendingRequestCompletionBlock = NULL;
-
-    [[NSNotificationCenter defaultCenter] postNotificationName:FBSDKApplicationDidBecomeActiveNotification object:self];
+    [self resetStateToDefault];
+  } else if (_pendingURLOpen) {
+    _pendingRequestExpirationTimer = [NSTimer scheduledTimerWithTimeInterval:3
+                                                                      target:self
+                                                                    selector:@selector(activityIndicatorTimerDidTimeOut)
+                                                                    userInfo:nil
+                                                                     repeats:NO];
   }
+}
+
+- (void)activityIndicatorTimerDidTimeOut {
+  [self resetStateToDefault];
+}
+
+- (void)resetStateToDefault {
+  _expectingBackground = NO;
+  _active = YES;
+  [_pendingURLOpen applicationDidBecomeActive:nil];
+  _pendingURLOpen = nil;
+
+  if (_pendingRequest && _pendingRequestCompletionBlock) {
+    _pendingRequestCompletionBlock([FBSDKBridgeAPIResponse bridgeAPIResponseCancelledWithRequest:_pendingRequest]);
+  }
+  _pendingRequest = nil;
+  _pendingRequestCompletionBlock = NULL;
+
+  [[NSNotificationCenter defaultCenter] postNotificationName:FBSDKApplicationDidBecomeActiveNotification object:self];
 }
 
 #pragma mark - Internal Methods
